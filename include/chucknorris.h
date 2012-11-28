@@ -1,0 +1,4 @@
+#ifndef CHUCKNORRIS_H
+#define CHUCKNORRIS_H
+
+#endif // CHUCKNORRIS_H
