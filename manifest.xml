@@ -1,0 +1,16 @@
+<package>
+  <description brief="chucknorris">
+
+     chucknorris
+
+  </description>
+  <author>Robert Viehauser</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/chucknorris</url>
+
+  <depend package="roscpp"/>
+
+</package>
+
+
