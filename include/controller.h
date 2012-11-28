@@ -1,9 +1,9 @@
+#ifndef CONTROLLER_H
+#define CONTROLLER_H
+
 #include "holedetector.h"
 #include "holeinspector.h"
 #include "mapreader.h"
-
-#ifndef CONTROLLER_H
-#define CONTROLLER_H
 
 class Controller
 {

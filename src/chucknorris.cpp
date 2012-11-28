@@ -16,10 +16,9 @@ int main(int argc, char** argv)
     //for registering the node
 
     Controller* controller = new Controller();
-    controller->getHoleDetector();
+    HoleDetector* hd_ptr = controller->getHoleDetector();
 
-
-    ros::Subscriber asus = n.subscribe("/depth/image_raw", 1, &HoleDetector::asusCallback, controller->getHoleDetector());
+    ros::Subscriber asus = n.subscribe("/depth/image_raw", 1, &HoleDetector::asusCallback, hd_ptr);
 
 
     std::cout << "I'll find you!!!" << std::endl;
