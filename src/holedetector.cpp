@@ -97,8 +97,8 @@ void HoleDetector::asusCallback(const sensor_msgs::Image::ConstPtr& msg)
     Mat mask;
     mask = image_8bit >= 0x50;
 
-
-    MSER extractor;
+    // int _delta, int _min_area, int _max_area, float _max_variation, float _min_diversity, int _max_evolution, double _area_threshold, double _min_margin, int _edge_blur_size
+    MSER extractor(5, 5000, 50000, 0.1f, 0.1f, 256, 0.1, 40.0f, 3);
     extractor(image_8bit, msers, mask);
 
     cvtColor(image_8bit, contour_image, CV_GRAY2BGR);
@@ -108,8 +108,6 @@ void HoleDetector::asusCallback(const sensor_msgs::Image::ConstPtr& msg)
     double area;
     for (size_t index = 0; index < msers.size(); index ++)
     {
-        area = contourArea(msers[index]);
-        if(area > 100)
           drawContours(contour_image, msers, index, colours[index%9], 1);
     }
 
@@ -119,10 +117,14 @@ void HoleDetector::asusCallback(const sensor_msgs::Image::ConstPtr& msg)
     image_vis = image_8bit_bgr*0.5 + contour_image*0.5;
 
 
-    imshow( msers_name, mask );
+    imshow( msers_name, image_8bit );
     imshow(image_name, image_vis);
 
     //cv::imwrite("labels.jpg", labels*2000);
+
+
+
+
 
     waitKey(1);
 
