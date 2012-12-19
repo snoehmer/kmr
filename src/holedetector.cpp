@@ -2,6 +2,8 @@
 #include "ros/message.h"
 #include "sensor_msgs/Image.h"
 #include "opencv2/opencv.hpp"
+#include "stdlib.h"
+
 
 using namespace cv;
 using namespace std;
@@ -22,6 +24,20 @@ static const Scalar colours[] =
 
 HoleDetector::HoleDetector()
 {
+    need_cam_info_ = true;
+}
+
+void HoleDetector::cameraInfoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg)
+{
+    std::cout << "CameraInfoCallback" << std::endl;
+    if(need_cam_info_)
+    {
+       camera_info_.P = msg->P;
+       std::cout << "stored camera info.. P: " << camera_info_.P.size() << std::endl;
+
+       need_cam_info_ = false;
+
+    }
 }
 
 void HoleDetector::asusCallback(const sensor_msgs::Image::ConstPtr& msg)
@@ -35,6 +51,8 @@ void HoleDetector::asusCallback(const sensor_msgs::Image::ConstPtr& msg)
 
     // value encoded in mm! 1.5m = 1500mm
     cv::Mat image = cv::Mat(height, width, CV_16UC1, data);
+    cv::Mat img0;
+    img0 = image.clone();
     cv::Mat temp;
     image.convertTo(temp, CV_32FC1);
     cv::threshold(temp, temp, 1500.0, 1500.0, cv::THRESH_TRUNC); // truncate depth to 1,5m
@@ -114,6 +132,8 @@ void HoleDetector::asusCallback(const sensor_msgs::Image::ConstPtr& msg)
 
     int colour_count = 0;
 
+
+
     for (size_t index = 0; index < contours.size(); index ++)
     {
         Rect rect = boundingRect(contours[index]);
@@ -123,18 +143,84 @@ void HoleDetector::asusCallback(const sensor_msgs::Image::ConstPtr& msg)
         bw_ratio = (float)rect.width/rect.height;
         if(area_ratio > min_area_ratio && bw_ratio < max_bw_ratio && bw_ratio > min_bw_ratio && bb_area > min_area && bb_area < max_area)
         {
+            //VISUALISATION
             drawContours(contour_image, contours, index, colours[colour_count], 1);
 
             Point center = Point(rect.x+rect.width/2, rect.y+rect.height/2);
             line(contour_image, center + Point(0, rect.height/2), center - Point(0, rect.height/2), colours[colour_count], 3);
             line(contour_image, center + Point(rect.width/2, 0), center - Point(rect.width/2, 0), colours[colour_count], 3);
             rectangle(contour_image, rect, colours[colour_count%9]);
-            std::cout << "stats: [" << index << "] area: " << bb_area << ",  w/h: " << bw_ratio << std::endl;
+            //std::cout << "stats: [" << index << "] area: " << bb_area << ",  w/h: " << bw_ratio << std::endl;
+            std::cout << "Center in depth image: " << center << std::endl;
 
+            //EXTRACT POINT
+            std::vector<cv::Point3f> bb_corners_img;
+            //top left
+            bb_corners_img.push_back(cv::Point3f((float)rect.x, (float)rect.y,(float)img0.at<short>(rect.y,rect.x)));
+            //top right
+            bb_corners_img.push_back(cv::Point3f((float)rect.x+rect.width, (float)rect.y,(float)img0.at<short>(rect.y,rect.x+rect.width)));
+            //bottom right
+            bb_corners_img.push_back(cv::Point3f((float)rect.x+rect.width, (float)rect.y+rect.height,(float)img0.at<short>(rect.y+rect.height, rect.x+rect.width)));
+            //bottom left
+            bb_corners_img.push_back(cv::Point3f((float)rect.x, (float)rect.y+rect.height,(float)img0.at<short>(rect.y+rect.height, rect.x)));
+
+            if(!need_cam_info_)
+            {
+                std::vector<cv::Point3f> bb_corners_real;
+                float u;
+                float v;
+                float fx = camera_info_.P[0*4+0];
+                float fy = camera_info_.P[1*4+1];
+                float cx = camera_info_.P[0*4+2];
+                float cy = camera_info_.P[1*4+2];
+                float Tx = camera_info_.P[0*4+3];
+                float Ty = camera_info_.P[1*4+3];
+
+
+                std::vector<cv::Point3f>::iterator it;
+                cv::Point3f center_real = cv::Point3f(0,0,0);
+                cv::Point3f real_point;
+                for (it = bb_corners_img.begin(); it != bb_corners_img.end(); it++)
+                {
+                    //CALCULATE REAL COORDINATES OF EACH BB-POINT
+                    //account for the fact the center point of the image is not the principal point
+                    //not sure if this is really correct or more of a hack, but without this the image
+                    //ends up shifted
+                    u = (float)it->x - (width/2  - cx);
+                    v = (float)it->y - (height/2 - cy);
+                    //std::cout << "u, v: " << u << ", " << v << std::endl;
+
+                    float x = ( (u - cx - Tx) / fx );
+                    float y = ( (v - cy - Ty) / fy );
+                    //std::cout << "x, y: " << x << ", " << y << std::endl;
+
+                    float z = ( 1.0 );
+                    float norm = sqrt(x*x + y*y + 1);
+                    float depth = (float)it->z;
+
+                    real_point.x = ( depth * x / norm );
+                    real_point.y = ( depth * y / norm );
+                    real_point.z = ( depth * z / norm );
+                    std::cout << "Real Point: " << fx << std::endl;
+
+                    bb_corners_real.push_back(real_point);
+                    //INTERPOLATE CENTER
+                    center_real = center_real + real_point;
+                }
+                center_real = center_real*0.25f;
+
+
+                std::cout << "Center in depth image: " << center << "  Position3D: [" << center_real.x << ", " << center_real.y << ", " << center_real.z << "]"  << std::endl;
+            }
+            else
+            {
+                std::cout << "NO CAM INFO YET!!" << std::endl;
+            }
             colour_count = (colour_count+1)%9;
         }
 
     }
+
 
 
 
