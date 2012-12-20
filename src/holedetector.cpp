@@ -3,7 +3,8 @@
 #include "sensor_msgs/Image.h"
 #include "opencv2/opencv.hpp"
 #include "stdlib.h"
-
+#include "geometry_msgs/Quaternion.h"
+#include "OGRE/OgreVector3.h"
 
 using namespace cv;
 using namespace std;
@@ -29,7 +30,7 @@ HoleDetector::HoleDetector()
 
 void HoleDetector::cameraInfoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg)
 {
-    std::cout << "CameraInfoCallback" << std::endl;
+    //std::cout << "CameraInfoCallback" << std::endl;
     if(need_cam_info_)
     {
        camera_info_.P = msg->P;
@@ -151,7 +152,7 @@ void HoleDetector::asusCallback(const sensor_msgs::Image::ConstPtr& msg)
             line(contour_image, center + Point(rect.width/2, 0), center - Point(rect.width/2, 0), colours[colour_count], 3);
             rectangle(contour_image, rect, colours[colour_count%9]);
             //std::cout << "stats: [" << index << "] area: " << bb_area << ",  w/h: " << bw_ratio << std::endl;
-            std::cout << "Center in depth image: " << center << std::endl;
+            //std::cout << "Center in depth image: " << center << std::endl;
 
             //EXTRACT POINT
             std::vector<cv::Point3f> bb_corners_img;
@@ -201,7 +202,7 @@ void HoleDetector::asusCallback(const sensor_msgs::Image::ConstPtr& msg)
                     real_point.x = ( depth * x / norm );
                     real_point.y = ( depth * y / norm );
                     real_point.z = ( depth * z / norm );
-                    std::cout << "Real Point: " << fx << std::endl;
+                    //std::cout << "Real Point: " << real_point.x << std::endl;
 
                     bb_corners_real.push_back(real_point);
                     //INTERPOLATE CENTER
@@ -211,12 +212,30 @@ void HoleDetector::asusCallback(const sensor_msgs::Image::ConstPtr& msg)
 
 
                 std::cout << "Center in depth image: " << center << "  Position3D: [" << center_real.x << ", " << center_real.y << ", " << center_real.z << "]"  << std::endl;
+
+                //cross vectors
+                cv::Point3f tl_br = bb_corners_real[2] - bb_corners_real[0];
+                cv::Point3f tr_bl = bb_corners_real[3] - bb_corners_real[1];
+
+                //normal vector
+                cv::Point3f norm_vec_cv = tl_br.cross(tr_bl);
+
+                Ogre::Vector3 norm_vec = Ogre::Vector3(norm_vec_cv.x, norm_vec_cv.y, norm_vec_cv.z);
+                norm_vec.normalise();
+
+                Ogre::Vector3 camera_vec = Ogre::Vector3(0.0f, 0.0f, 1.0f);
+                std::cout << "Norm Vector: " << norm_vec << std::endl;
+
+                Ogre::Quaternion quati = camera_vec.getRotationTo(norm_vec);
+                std::cout << "Quaternion: " << quati << std::endl;
+
             }
             else
             {
                 std::cout << "NO CAM INFO YET!!" << std::endl;
             }
             colour_count = (colour_count+1)%9;
+            std::cout << std::endl << "------------------------------------------------" << std::endl;
         }
 
     }
@@ -288,3 +307,4 @@ void HoleDetector::asusCallback(const sensor_msgs::Image::ConstPtr& msg)
 
 
 }
+
